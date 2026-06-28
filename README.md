@@ -5,7 +5,6 @@ and swings, lags and overshoots. The bob is what collects cyan **orbs** (points 
 a rising combo) and what dies to red **mines**. You can't place the bob — you
 *whip* it: flick the anchor and let momentum sling the bob where you want it.
 
-One thumb. Endless. Resolution-independent.
 
 ## Run on desktop (to test)
 
