@@ -77,6 +77,8 @@ ORB_DIM = (0.11, 0.43, 0.43)
 MINE_C = (1.0, 0.337, 0.439)
 MINE_CORE = (0.478, 0.122, 0.18)
 SPIN_C = (1.0, 0.45, 0.65)
+SEEK_C = (0.72, 0.45, 1.0)
+SEEK_CORE = (0.32, 0.18, 0.52)
 GOAL_C = (0.42, 0.95, 0.45)
 GOAL_DIM = (0.16, 0.45, 0.20)
 TITLE_C = (1.0, 0.82, 0.40, 1)
@@ -95,9 +97,11 @@ Window.clearcolor = (*BG, 1)
 # --- Levels (ASCII grids; rows top->bottom, all rows same width) ------------
 # '#' wall  '.' empty  'S' start  'G' goal  '*' orb  'O' spinner
 # 'x' static mine   'h' horizontal-patrol mine   'v' vertical-patrol mine
+# 's' seeker (slowly homes toward the bob)
+# Optional per-level keys: "spring_k","spring_damp" (jiggliness), "bob" (size mult).
 # Every grid is checked by hard_solvable() so a hazard-free (1-life) route exists.
 LEVELS = [
-    {"name": "First Steps", "grid": [
+    {"name": "First Steps", "spring_k": 0.06, "spring_damp": 0.905, "grid": [
         ".........",
         "...S.....",
         ".........",
@@ -110,7 +114,7 @@ LEVELS = [
         ".....G...",
         ".........",
     ]},
-    {"name": "Sentry", "grid": [
+    {"name": "Sentry", "spring_k": 0.0591, "spring_damp": 0.9067, "grid": [
         ".........",
         ".S.......",
         ".........",
@@ -121,33 +125,7 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "The Maze", "grid": [
-        "#########",
-        "#S......#",
-        "#######.#",
-        "#.......#",
-        "#.#######",
-        "#......*#",
-        "#######.#",
-        "#.......#",
-        "#.#######",
-        "#......G#",
-        "#########",
-    ]},
-    {"name": "Crossfire", "grid": [
-        ".........",
-        ".S.......",
-        ".........",
-        "....#....",
-        ".........",
-        "....v....",
-        ".........",
-        "....#....",
-        ".........",
-        ".......G.",
-        ".........",
-    ]},
-    {"name": "Pillars", "grid": [
+    {"name": "Pillars", "spring_k": 0.0582, "spring_damp": 0.9084, "grid": [
         ".........",
         ".S.......",
         "..#.#.#..",
@@ -159,19 +137,7 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Spinner", "grid": [
-        ".........",
-        ".S.......",
-        ".........",
-        ".........",
-        "....O....",
-        "....*....",
-        ".........",
-        ".........",
-        ".......G.",
-        ".........",
-    ]},
-    {"name": "Gates", "grid": [
+    {"name": "Gates", "spring_k": 0.0573, "spring_damp": 0.9102, "grid": [
         ".........",
         ".S.......",
         ".........",
@@ -182,7 +148,7 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Twin Patrol", "grid": [
+    {"name": "Twin Patrol", "spring_k": 0.0564, "spring_damp": 0.9119, "grid": [
         ".........",
         ".S.......",
         "..#...#..",
@@ -195,19 +161,19 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Sweepers", "grid": [
+    {"name": "Spinner", "spring_k": 0.0555, "spring_damp": 0.9136, "grid": [
         ".........",
         ".S.......",
-        ".#.....h.",
         ".........",
-        "h......#.",
         ".........",
-        ".#.....h.",
+        "....O....",
+        "....*....",
+        ".........",
         ".........",
         ".......G.",
         ".........",
     ]},
-    {"name": "Minefield", "grid": [
+    {"name": "Minefield", "spring_k": 0.0546, "spring_damp": 0.9153, "grid": [
         ".........",
         ".S.......",
         "...x.x...",
@@ -220,7 +186,58 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Twin Spinners", "grid": [
+    {"name": "The Maze", "spring_k": 0.0537, "spring_damp": 0.9171, "grid": [
+        "#########",
+        "#S......#",
+        "#######.#",
+        "#.......#",
+        "#.#######",
+        "#......*#",
+        "#######.#",
+        "#.......#",
+        "#.#######",
+        "#......G#",
+        "#########",
+    ]},
+    {"name": "Crossfire", "spring_k": 0.0528, "spring_damp": 0.9188, "grid": [
+        ".........",
+        ".S.......",
+        ".........",
+        "....#....",
+        ".........",
+        "....v....",
+        ".........",
+        "....#....",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "The Comb", "spring_k": 0.0519, "spring_damp": 0.9205, "grid": [
+        ".........",
+        ".S.......",
+        ".#.#.#.#.",
+        ".#.#.#.#.",
+        ".........",
+        "....*....",
+        ".#.#.#.#.",
+        ".#.#.#.#.",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Chicane", "spring_k": 0.051, "spring_damp": 0.9222, "grid": [
+        ".........",
+        ".S.......",
+        ".####....",
+        ".........",
+        "....####.",
+        ".........",
+        ".#.....h.",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Twin Spinners", "spring_k": 0.0501, "spring_damp": 0.924, "grid": [
         ".........",
         ".S.......",
         ".........",
@@ -233,32 +250,7 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Chicane", "grid": [
-        ".........",
-        ".S.......",
-        ".####....",
-        ".........",
-        "....####.",
-        ".........",
-        ".#.....h.",
-        ".........",
-        ".......G.",
-        ".........",
-    ]},
-    {"name": "The Comb", "grid": [
-        ".........",
-        ".S.......",
-        ".#.#.#.#.",
-        ".#.#.#.#.",
-        ".........",
-        "....*....",
-        ".#.#.#.#.",
-        ".#.#.#.#.",
-        ".........",
-        ".......G.",
-        ".........",
-    ]},
-    {"name": "Crosshall", "grid": [
+    {"name": "Crosshall", "spring_k": 0.0492, "spring_damp": 0.9257, "grid": [
         "#########",
         "####.####",
         "####.####",
@@ -269,7 +261,41 @@ LEVELS = [
         "####*####",
         "#########",
     ]},
-    {"name": "Spin & Run", "grid": [
+    {"name": "Sweepers", "spring_k": 0.0483, "spring_damp": 0.9274, "grid": [
+        ".........",
+        ".S.......",
+        ".#.....h.",
+        ".........",
+        "h......#.",
+        ".........",
+        ".#.....h.",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Wide Maze", "spring_k": 0.0474, "spring_damp": 0.9291, "grid": [
+        "#########",
+        "#S......#",
+        "#......##",
+        "##......#",
+        "#......##",
+        "##......#",
+        "#......##",
+        "##.....G#",
+        "#########",
+    ]},
+    {"name": "Quadrants", "spring_k": 0.0466, "spring_damp": 0.9309, "grid": [
+        ".........",
+        ".S.......",
+        "....#....",
+        "....#....",
+        "##.####.#",
+        "....#....",
+        "....#....",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Spin & Run", "spring_k": 0.0457, "spring_damp": 0.9326, "grid": [
         ".........",
         ".S.......",
         ".........",
@@ -282,18 +308,7 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Wide Maze", "grid": [
-        "#########",
-        "#S......#",
-        "#......##",
-        "##......#",
-        "#......##",
-        "##......#",
-        "#......##",
-        "##.....G#",
-        "#########",
-    ]},
-    {"name": "Bunkers", "grid": [
+    {"name": "Bunkers", "spring_k": 0.0448, "spring_damp": 0.9343, "grid": [
         ".........",
         ".S.......",
         "..##.....",
@@ -306,18 +321,19 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Quadrants", "grid": [
+    {"name": "Hunter", "spring_k": 0.0439, "spring_damp": 0.936, "grid": [
         ".........",
         ".S.......",
-        "....#....",
-        "....#....",
-        "##.####.#",
-        "....#....",
-        "....#....",
+        ".........",
+        ".........",
+        "....s....",
+        "....*....",
+        ".........",
+        ".........",
         ".......G.",
         ".........",
     ]},
-    {"name": "Gauntlet II", "grid": [
+    {"name": "Gauntlet II", "spring_k": 0.043, "spring_damp": 0.9378, "grid": [
         ".........",
         ".S.......",
         "...O.....",
@@ -330,7 +346,112 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Final", "grid": [
+    {"name": "Pursuit", "spring_k": 0.0421, "spring_damp": 0.9395, "grid": [
+        ".........",
+        ".S.......",
+        "..##.....",
+        ".........",
+        ".....s...",
+        "...##....",
+        ".........",
+        ".....##..",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Sweep & Seek", "spring_k": 0.0412, "spring_damp": 0.9412, "grid": [
+        ".........",
+        ".S.......",
+        ".#.....h.",
+        ".........",
+        "h......#.",
+        "....s....",
+        ".#.....h.",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Spin Trap", "spring_k": 0.0403, "spring_damp": 0.9429, "grid": [
+        ".........",
+        ".S.......",
+        ".........",
+        "...O.....",
+        ".........",
+        "....s....",
+        ".........",
+        ".....O...",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Tight Maze", "spring_k": 0.0394, "spring_damp": 0.9447, "grid": [
+        "###########",
+        "#S........#",
+        "#########.#",
+        "#.........#",
+        "#.#########",
+        "#.........#",
+        "#########.#",
+        "#.........#",
+        "#.#########",
+        "#........G#",
+        "###########",
+    ]},
+    {"name": "Swarm", "spring_k": 0.0385, "spring_damp": 0.9464, "grid": [
+        ".........",
+        ".S.......",
+        ".x.x.x.x.",
+        ".........",
+        ".x.x.x.x.",
+        "....*....",
+        ".x.x.x.x.",
+        ".........",
+        ".x.x.x.x.",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Stalkers", "spring_k": 0.0376, "spring_damp": 0.9481, "bob": 1.08, "grid": [
+        ".........",
+        ".S.......",
+        ".........",
+        "...s.....",
+        ".........",
+        "....*....",
+        ".........",
+        ".....s...",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "The Web", "spring_k": 0.0367, "spring_damp": 0.9498, "grid": [
+        ".........",
+        ".S.......",
+        ".........",
+        "...O.O...",
+        ".........",
+        "....s....",
+        "....*....",
+        ".........",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Labyrinth", "spring_k": 0.0358, "spring_damp": 0.9516, "grid": [
+        "###########",
+        "#S........#",
+        "#.#########",
+        "#.........#",
+        "#########.#",
+        "#.........#",
+        "#.#########",
+        "#.........#",
+        "#########.#",
+        "#.........#",
+        "#.#########",
+        "#........G#",
+        "###########",
+    ]},
+    {"name": "Final", "spring_k": 0.0349, "spring_damp": 0.9533, "grid": [
         ".........",
         ".S.......",
         ".#.....h.",
@@ -343,10 +464,25 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
+    {"name": "Showdown", "spring_k": 0.034, "spring_damp": 0.955, "bob": 1.08, "grid": [
+        ".........",
+        ".S.......",
+        "...O.O...",
+        "....s....",
+        ".#....h..",
+        ".x......x",
+        ".#....h..",
+        "....s....",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
 ]
 
 SPIN_LEN_CELLS = 1.3        # spinner bar length in cells (kept short to dodge)
 SPIN_DANGER = 1.75          # cells within this of a spinner centre are unsafe
+SEEK_SPD_CELLS = 0.018      # seeker max speed (cells/step) -- slower than the bob
+SEEK_ACC_CELLS = 0.0017     # how hard a seeker steers toward the bob
 
 MOVERS = "hvm"              # h: horizontal patrol, v: vertical patrol, m: auto
 
@@ -499,6 +635,9 @@ class GameWidget(Widget):
         self._buttons = []
         self._tiles = []
         self._ready = False
+        self.bobscale = 1.0
+        self.spk = SPRING_K
+        self.spd = SPRING_DAMP
 
         Window.bind(on_key_down=self._key_down, on_key_up=self._key_up)
         Clock.schedule_interval(self.tick, 0)
@@ -558,7 +697,7 @@ class GameWidget(Widget):
         gw, gh = cell * cols, cell * rows
         self.gx0 = x0 + (pw - gw) / 2
         self.gy0 = y0 + (ph - gh) / 2
-        self.r_bob = cell * 0.27
+        self.r_bob = cell * 0.27 * self.bobscale
         self.r_anchor = cell * 0.16
         self.r_mine = cell * 0.30
         self.r_orb = cell * 0.20
@@ -593,7 +732,7 @@ class GameWidget(Widget):
         spec = LEVELS[idx]
         grid = spec["grid"]
         rows, cols = len(grid), len(grid[0])
-        walls, statics, movers, orbs, spinners = set(), [], [], [], []
+        walls, statics, movers, orbs, spinners, seekers = set(), [], [], [], [], []
         for i, row in enumerate(grid):
             for j, ch in enumerate(row):
                 if ch == "#":
@@ -602,6 +741,8 @@ class GameWidget(Widget):
                     statics.append((i, j))
                 elif ch in MOVERS:
                     movers.append((i, j, ch))
+                elif ch == "s":
+                    seekers.append((i, j))
                 elif ch == "*":
                     orbs.append((i, j))
                 elif ch == "O":
@@ -609,7 +750,11 @@ class GameWidget(Widget):
         self.cur = {"name": spec["name"], "grid": grid, "rows": rows, "cols": cols,
                     "walls": walls, "start": _find(grid, "S"), "goal": _find(grid, "G"),
                     "statics": statics, "movers": movers, "orbs": orbs,
-                    "spinners": spinners}
+                    "spinners": spinners, "seekers": seekers}
+        # Per-level feel: jiggliness + bob size (default to the globals).
+        self.bobscale = spec.get("bob", 1.0)
+        self.spk = spec.get("spring_k", SPRING_K)
+        self.spd = spec.get("spring_damp", SPRING_DAMP)
         self.level_idx = idx
         self._layout_level()
 
@@ -652,6 +797,14 @@ class GameWidget(Widget):
             cx, cy = self.cell_center(i, j)
             self.spinners.append({"cx": cx, "cy": cy, "ang": random.uniform(0, 6.28),
                                   "len": self.cell * SPIN_LEN_CELLS, "spd": 0.035})
+        self.seek_spd = self.cell * SEEK_SPD_CELLS
+        self.seek_acc = self.cell * SEEK_ACC_CELLS
+        self.seekers = []
+        for (i, j) in c["seekers"]:
+            cx, cy = self.cell_center(i, j)
+            ang = random.uniform(0, math.tau)
+            self.seekers.append(MovingMine(cx, cy, math.cos(ang) * self.seek_spd,
+                                           math.sin(ang) * self.seek_spd))
         self.orbs = [{"x": self.cell_center(i, j)[0], "y": self.cell_center(i, j)[1],
                       "got": False} for (i, j) in c["orbs"]]
         self.goal_xy = self.cell_center(*c["goal"])
@@ -833,8 +986,8 @@ class GameWidget(Widget):
         y1 = self.gy0 + self.cell * self.cur["rows"]
         self._move_anchor(x0, y0, x1, y1)
 
-        self.bvx = (self.bvx + (self.ax - self.bx) * SPRING_K) * SPRING_DAMP
-        self.bvy = (self.bvy + (self.ay - self.by) * SPRING_K) * SPRING_DAMP
+        self.bvx = (self.bvx + (self.ax - self.bx) * self.spk) * self.spd
+        self.bvy = (self.bvy + (self.ay - self.by) * self.spk) * self.spd
         sp = math.hypot(self.bvx, self.bvy)
         if sp > self.bob_vmax:
             self.bvx *= self.bob_vmax / sp
@@ -890,6 +1043,27 @@ class GameWidget(Widget):
             if self._point_seg(self.bx, self.by, s["cx"], s["cy"], ex, ey) \
                     < rb + self.cell * 0.10:
                 self._hurt(s["cx"], s["cy"])
+
+        # Seekers: steer gently toward the bob, capped well below bob speed so
+        # they can always be outrun; bounce off walls and the play bounds.
+        for sk in self.seekers:
+            dx, dy = self.bx - sk.x, self.by - sk.y
+            d = math.hypot(dx, dy) or 1.0
+            sk.vx += dx / d * self.seek_acc
+            sk.vy += dy / d * self.seek_acc
+            ss = math.hypot(sk.vx, sk.vy)
+            if ss > self.seek_spd:
+                sk.vx *= self.seek_spd / ss
+                sk.vy *= self.seek_spd / ss
+            nxp, nyp = sk.x + sk.vx, sk.y + sk.vy
+            si, sj = self.pixel_cell(nxp, nyp)
+            if not (x0 <= nxp <= x1 and y0 <= nyp <= y1) \
+                    or (si, sj) in self.cur["walls"]:
+                sk.vx, sk.vy = -sk.vx * 0.6, -sk.vy * 0.6
+            else:
+                sk.x, sk.y = nxp, nyp
+            if math.hypot(sk.x - self.bx, sk.y - self.by) < rb + self.r_mine * 0.9:
+                self._hurt(sk.x, sk.y)
 
         for o in self.orbs:
             if not o["got"] and math.hypot(o["x"] - self.bx, o["y"] - self.by) < rb + self.r_orb:
@@ -1207,6 +1381,8 @@ class GameWidget(Widget):
             self._disc(ex + ox, ey + oy, cell * 0.12)
             Color(*MINE_CORE)
             self._disc(sp["cx"] + ox, sp["cy"] + oy, cell * 0.14)
+        for sk in self.seekers:
+            self._seeker(sk.x + ox, sk.y + oy)
 
         self._draw_bob(ox, oy, self.r_bob, self.r_anchor)
 
@@ -1258,6 +1434,16 @@ class GameWidget(Widget):
         self._disc(x, y, r)
         Color(*MINE_CORE)
         self._disc(x, y, r * 0.42)
+
+    def _seeker(self, x, y):
+        r = self.r_mine * 0.95
+        Color(*SEEK_CORE)
+        self._disc(x, y, r + self.scale * 0.004)
+        Color(*SEEK_C)
+        self._disc(x, y, r)
+        Color(*SEEK_CORE)        # an off-centre "pupil" facing the bob
+        a = math.atan2(self.by - y, self.bx - x)
+        self._disc(x + math.cos(a) * r * 0.35, y + math.sin(a) * r * 0.35, r * 0.42)
 
     # ----- HUD / menus
     def _draw_play_hud(self):

@@ -5,11 +5,16 @@ and swings, lags and overshoots. You can't place the bob — you *whip* it: flic
 the anchor and let momentum sling the bob where you want it.
 
 Two modes from the start menu:
-- **Levels** — 20 numbered levels; thread the jiggly bob to the green **exit**.
+- **Levels** — 30 numbered levels on a rising **difficulty curve**: the tether
+  gets jigglier (springier, more overshoot) and the hazards denser as you go.
   Tiles show locks, unlocks and earned **stars**, saved between runs. Every level
   is guaranteed beatable on a **single life** (a hazard-free route is verified).
 - **Survival** — endless arena: whip the bob through orbs for score + combo while
   the mine swarm keeps growing. The high score is tracked **per difficulty**.
+
+Each level can tune its own feel via optional `spring_k` / `spring_damp`
+(jiggliness) and `bob` (size) keys, so later levels swing more and leave less
+margin. Bigger grids (e.g. the 11-wide mazes) shrink the cells for tighter runs.
 
 **Difficulty** sets your lives and applies to both modes:
 **Easy 5 · Medium 3 · Hard 1** (chosen on the menu, saved between runs).
@@ -19,11 +24,13 @@ Two modes from the start menu:
 - **Static mines** — fixed red spikes.
 - **Moving mines** — patrol horizontally or vertically along their lane.
 - **Spinners** — short rotating bars that sweep an area; time your passage.
+- **Seekers** (purple) — slowly home toward the bob; capped below bob speed so
+  they can always be outrun, but they punish dawdling.
 - **Orbs** (cyan) — optional collectibles that help your star rating.
 
 Levels are authored as ASCII grids in `LEVELS` (top of `main.py`) — `#` wall,
 `S` start, `G` goal, `x` static mine, `h`/`v` horizontal/vertical moving mine,
-`O` spinner, `*` orb. Before a level loads, `hard_solvable()` verifies a fully
+`s` seeker, `O` spinner, `*` orb. Before a level loads, `hard_solvable()` verifies a fully
 **hazard-free route** exists (avoiding walls, static mines, each moving mine's
 whole patrol lane, and every spinner's reach) — so every level is genuinely
 beatable on **Hard (1 life)**, not just geometrically connected.
