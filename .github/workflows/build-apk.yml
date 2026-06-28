@@ -47,6 +47,11 @@ jobs:
           key: buildozer-project-${{ hashFiles('buildozer.spec') }}
           restore-keys: buildozer-project-
 
+      - name: Accept Android SDK licenses
+        run: yes | buildozer android debug || true
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
       - name: Build debug APK
         run: buildozer android debug
         env:
