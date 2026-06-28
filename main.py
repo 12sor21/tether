@@ -93,8 +93,9 @@ COMBO_TXT = (0.204, 0.878, 0.878, 1)
 Window.clearcolor = (*BG, 1)
 
 # --- Levels (ASCII grids; rows top->bottom, all rows same width) ------------
-# '#' wall  '.' empty  'S' start  'G' goal
-# 'x' static mine  'm' moving mine  '*' orb  'O' spinner
+# '#' wall  '.' empty  'S' start  'G' goal  '*' orb  'O' spinner
+# 'x' static mine   'h' horizontal-patrol mine   'v' vertical-patrol mine
+# Every grid is checked by hard_solvable() so a hazard-free (1-life) route exists.
 LEVELS = [
     {"name": "First Steps", "grid": [
         ".........",
@@ -109,30 +110,15 @@ LEVELS = [
         ".....G...",
         ".........",
     ]},
-    {"name": "Detour", "grid": [
+    {"name": "Sentry", "grid": [
         ".........",
         ".S.......",
-        ".....###.",
-        ".....m...",
-        ".###.....",
-        "....*....",
-        ".....###.",
         ".........",
-        ".###.....",
-        "......G..",
+        ".#.....#.",
+        ".#..h..#.",
+        ".#.....#.",
         ".........",
-    ]},
-    {"name": "Patrol", "grid": [
-        ".........",
-        ".S.......",
-        "....m....",
-        "...###...",
-        ".........",
-        "..m..*.m.",
-        ".........",
-        "...###...",
-        "....m....",
-        "......G..",
+        ".......G.",
         ".........",
     ]},
     {"name": "The Maze", "grid": [
@@ -148,75 +134,78 @@ LEVELS = [
         "#......G#",
         "#########",
     ]},
-    {"name": "Spikes & Halls", "grid": [
-        "#########",
-        "#S......#",
-        "#.#####.#",
-        "#...m...#",
-        "#.#####.#",
-        "#x......#",
-        "#.#####.#",
-        "#...m..*#",
-        "#####.#.#",
-        "#.......#",
-        "#.#####.#",
-        "#x....G.#",
-        "#########",
-    ]},
-    {"name": "Gauntlet", "grid": [
+    {"name": "Crossfire", "grid": [
         ".........",
         ".S.......",
-        "....O....",
         ".........",
-        "..x...x..",
-        "....*....",
-        "..m...m..",
+        "....#....",
         ".........",
-        "....O....",
+        "....v....",
         ".........",
-        "......G..",
+        "....#....",
         ".........",
-    ]},
-    {"name": "Slalom", "grid": [
-        ".........",
-        ".S.......",
-        "...#.....",
-        ".....m...",
-        ".#.....#.",
-        "....*....",
-        ".#.....#.",
-        "...m.....",
-        ".....#...",
         ".......G.",
         ".........",
     ]},
-    {"name": "Pinwheel", "grid": [
+    {"name": "Pillars", "grid": [
         ".........",
         ".S.......",
+        "..#.#.#..",
         ".........",
-        "...O.....",
+        "..#.x.#..",
+        "....*....",
+        "..#.#.#..",
         ".........",
-        "..x...x..",
-        ".....*...",
-        ".........",
-        ".....O...",
         ".......G.",
         ".........",
     ]},
-    {"name": "Switchback", "grid": [
-        "#########",
-        "#S......#",
-        "#.#######",
-        "#......m#",
-        "#######.#",
-        "#m......#",
-        "#.#######",
-        "#......m#",
-        "#######.#",
-        "#.......#",
-        "#.#######",
-        "#......G#",
-        "#########",
+    {"name": "Spinner", "grid": [
+        ".........",
+        ".S.......",
+        ".........",
+        ".........",
+        "....O....",
+        "....*....",
+        ".........",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Gates", "grid": [
+        ".........",
+        ".S.......",
+        ".........",
+        "#######..",
+        ".........",
+        "..#######",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Twin Patrol", "grid": [
+        ".........",
+        ".S.......",
+        "..#...#..",
+        "..v...v..",
+        ".........",
+        "....*....",
+        ".........",
+        "..#...#..",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Sweepers", "grid": [
+        ".........",
+        ".S.......",
+        ".#.....h.",
+        ".........",
+        "h......#.",
+        ".........",
+        ".#.....h.",
+        ".........",
+        ".......G.",
+        ".........",
     ]},
     {"name": "Minefield", "grid": [
         ".........",
@@ -231,44 +220,28 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Twin Spins", "grid": [
+    {"name": "Twin Spinners", "grid": [
         ".........",
         ".S.......",
-        "....O....",
         ".........",
+        "...O.....",
         ".........",
-        "..*...*..",
+        "....*....",
         ".........",
+        ".....O...",
         ".........",
-        "....O....",
         ".......G.",
         ".........",
     ]},
-    {"name": "Tight Squeeze", "grid": [
-        "#########",
-        "#......S#",
-        "#.#######",
-        "#.......#",
-        "#######.#",
-        "#.......#",
-        "#.#######",
-        "#.......#",
-        "#######.#",
-        "#.......#",
-        "#.#######",
-        "#G......#",
-        "#########",
-    ]},
-    {"name": "Box Step", "grid": [
+    {"name": "Chicane", "grid": [
         ".........",
         ".S.......",
-        "..##.....",
+        ".####....",
         ".........",
-        ".....##..",
-        "...*.....",
-        "..##.....",
+        "....####.",
         ".........",
-        ".....##..",
+        ".#.....h.",
+        ".........",
         ".......G.",
         ".........",
     ]},
@@ -285,32 +258,39 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
-    {"name": "Spinner Alley", "grid": [
+    {"name": "Crosshall", "grid": [
+        "#########",
+        "####.####",
+        "####.####",
+        "####.####",
+        "#S.....G#",
+        "####.####",
+        "####.####",
+        "####*####",
+        "#########",
+    ]},
+    {"name": "Spin & Run", "grid": [
         ".........",
         ".S.......",
         ".........",
-        "..O.O.O..",
+        "....O....",
         ".........",
-        "....*....",
+        ".#.....h.",
         ".........",
-        "..O.O.O..",
+        "....O....",
         ".........",
         ".......G.",
         ".........",
     ]},
-    {"name": "Zigzag", "grid": [
+    {"name": "Wide Maze", "grid": [
         "#########",
         "#S......#",
-        "#.#######",
-        "#...O...#",
-        "#######.#",
-        "#.......#",
-        "#.#######",
-        "#...O...#",
-        "#######.#",
-        "#.......#",
-        "#.#######",
-        "#......G#",
+        "#......##",
+        "##......#",
+        "#......##",
+        "##......#",
+        "#......##",
+        "##.....G#",
         "#########",
     ]},
     {"name": "Bunkers", "grid": [
@@ -326,55 +306,49 @@ LEVELS = [
         ".......G.",
         ".........",
     ]},
+    {"name": "Quadrants", "grid": [
+        ".........",
+        ".S.......",
+        "....#....",
+        "....#....",
+        "##.####.#",
+        "....#....",
+        "....#....",
+        ".......G.",
+        ".........",
+    ]},
     {"name": "Gauntlet II", "grid": [
         ".........",
         ".S.......",
         "...O.....",
         ".........",
         ".x.....x.",
-        "....*..m.",
+        ".#....h*.",
         ".x.....x.",
         ".........",
-        ".....O...",
+        "...O.....",
         ".......G.",
         ".........",
     ]},
-    {"name": "The Cage", "grid": [
-        "#########",
-        "#......S#",
-        "#######.#",
-        "#m......#",
-        "#.#######",
-        "#......O#",
-        "#######.#",
-        "#m......#",
-        "#.#######",
-        "#......m#",
-        "#######.#",
-        "#G......#",
-        "#########",
-    ]},
     {"name": "Final", "grid": [
-        "#########",
-        "#S......#",
-        "#.#######",
-        "#....O..#",
-        "#######.#",
-        "#..m....#",
-        "#.#######",
-        "#....m..#",
-        "#######.#",
-        "#..O....#",
-        "#.#######",
-        "#......G#",
-        "#########",
+        ".........",
+        ".S.......",
+        ".#.....h.",
+        ".........",
+        "h......#.",
+        "....*....",
+        ".#.....h.",
+        ".........",
+        "h......#.",
+        ".......G.",
+        ".........",
     ]},
 ]
 
-# bob may physically occupy any non-wall cell
-PASSABLE = set(".SGxm*O")
-# a NO-HIT route (1 life) must avoid walls AND static-mine cells
-SAFE = set(".SGm*O")
+SPIN_LEN_CELLS = 1.3        # spinner bar length in cells (kept short to dodge)
+SPIN_DANGER = 1.75          # cells within this of a spinner centre are unsafe
+
+MOVERS = "hvm"              # h: horizontal patrol, v: vertical patrol, m: auto
 
 
 def clamp(v, lo, hi):
@@ -389,10 +363,15 @@ def _find(grid, ch):
     return None
 
 
-def _bfs(grid, passable):
-    rows, cols = len(grid), len(grid[0])
+def _dims(grid):
+    return len(grid), len(grid[0])
+
+
+def _reach(grid, blocked):
+    """Is there a 4-connected route S->G through cells NOT in `blocked`?"""
+    rows, cols = _dims(grid)
     s, g = _find(grid, "S"), _find(grid, "G")
-    if not s or not g:
+    if not s or not g or s in blocked or g in blocked:
         return False
     seen, q = {s}, deque([s])
     while q:
@@ -402,20 +381,62 @@ def _bfs(grid, passable):
         for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             ni, nj = i + di, j + dj
             if 0 <= ni < rows and 0 <= nj < cols and (ni, nj) not in seen \
-                    and grid[ni][nj] in passable:
+                    and (ni, nj) not in blocked:
                 seen.add((ni, nj))
                 q.append((ni, nj))
     return False
 
 
-def solvable(grid):
-    """Connectivity through any non-wall cell."""
-    return _bfs(grid, PASSABLE)
+def _walls(grid):
+    return {(i, j) for i, row in enumerate(grid)
+            for j, ch in enumerate(row) if ch == "#"}
 
 
-def no_hit_solvable(grid):
-    """A route exists avoiding walls AND static mines -> beatable on 1 life."""
-    return _bfs(grid, SAFE)
+def connected(grid):
+    """Any route through non-wall cells (ignores hazards)."""
+    return _reach(grid, _walls(grid))
+
+
+def hazard_cells(grid):
+    """Every cell a hazard can reach: walls, static mines, the FULL patrol line
+    of each moving mine, and each spinner's reach. Avoiding all of these is a
+    guaranteed no-hit route -> the level is beatable on a single life."""
+    rows, cols = _dims(grid)
+    walls = _walls(grid)
+    blocked = set(walls)
+    for i, row in enumerate(grid):
+        for j, ch in enumerate(row):
+            if ch == "x":
+                blocked.add((i, j))
+            elif ch in MOVERS:
+                horiz = ch in "hm"
+                vert = ch in "vm"
+                if horiz:
+                    jj = j
+                    while jj >= 0 and (i, jj) not in walls:
+                        blocked.add((i, jj)); jj -= 1
+                    jj = j + 1
+                    while jj < cols and (i, jj) not in walls:
+                        blocked.add((i, jj)); jj += 1
+                if vert:
+                    ii = i
+                    while ii >= 0 and (ii, j) not in walls:
+                        blocked.add((ii, j)); ii -= 1
+                    ii = i + 1
+                    while ii < rows and (ii, j) not in walls:
+                        blocked.add((ii, j)); ii += 1
+            elif ch == "O":
+                rad = int(SPIN_DANGER) + 1
+                for di in range(-rad, rad + 1):
+                    for dj in range(-rad, rad + 1):
+                        if math.hypot(di, dj) <= SPIN_DANGER:
+                            blocked.add((i + di, j + dj))
+    return blocked
+
+
+def hard_solvable(grid):
+    """A fully hazard-free S->G route exists -> beatable on Hard (1 life)."""
+    return _reach(grid, hazard_cells(grid))
 
 
 class MovingMine:
@@ -579,8 +600,8 @@ class GameWidget(Widget):
                     walls.add((i, j))
                 elif ch == "x":
                     statics.append((i, j))
-                elif ch == "m":
-                    movers.append((i, j))
+                elif ch in MOVERS:
+                    movers.append((i, j, ch))
                 elif ch == "*":
                     orbs.append((i, j))
                 elif ch == "O":
@@ -609,23 +630,28 @@ class GameWidget(Widget):
         self._steer_touch = None
 
         self.mmines = []
-        for (i, j) in c["movers"]:
+        for (i, j, ch) in c["movers"]:
             cx, cy = self.cell_center(i, j)
-            horiz = (not self.is_wall(i, j - 1)) or (not self.is_wall(i, j + 1))
-            vert = (not self.is_wall(i - 1, j)) or (not self.is_wall(i + 1, j))
             spd = self.cell * 0.03
-            if horiz and not vert:
+            if ch == "h":
                 vx, vy = spd, 0.0
-            elif vert and not horiz:
+            elif ch == "v":
                 vx, vy = 0.0, spd
-            else:
-                vx, vy = (spd, 0.0) if random.random() < 0.5 else (0.0, spd)
+            else:   # 'm' auto-picks an axis from its open neighbours
+                horiz = (not self.is_wall(i, j - 1)) or (not self.is_wall(i, j + 1))
+                vert = (not self.is_wall(i - 1, j)) or (not self.is_wall(i + 1, j))
+                if horiz and not vert:
+                    vx, vy = spd, 0.0
+                elif vert and not horiz:
+                    vx, vy = 0.0, spd
+                else:
+                    vx, vy = (spd, 0.0) if random.random() < 0.5 else (0.0, spd)
             self.mmines.append(MovingMine(cx, cy, vx, vy))
         self.spinners = []
         for (i, j) in c["spinners"]:
             cx, cy = self.cell_center(i, j)
             self.spinners.append({"cx": cx, "cy": cy, "ang": random.uniform(0, 6.28),
-                                  "len": self.cell * 2.1, "spd": 0.035})
+                                  "len": self.cell * SPIN_LEN_CELLS, "spd": 0.035})
         self.orbs = [{"x": self.cell_center(i, j)[0], "y": self.cell_center(i, j)[1],
                       "got": False} for (i, j) in c["orbs"]]
         self.goal_xy = self.cell_center(*c["goal"])
@@ -1382,8 +1408,8 @@ class TetherApp(App):
 
 if __name__ == "__main__":
     for _lv in LEVELS:
-        assert no_hit_solvable(_lv["grid"]), \
-            f"Level not beatable on 1 life: {_lv['name']}"
+        assert hard_solvable(_lv["grid"]), \
+            f"Level not beatable on Hard (1 life): {_lv['name']}"
     if platform not in ("android", "ios"):
         Window.size = (414, 736)
     TetherApp().run()

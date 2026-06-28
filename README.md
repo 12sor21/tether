@@ -7,7 +7,7 @@ the anchor and let momentum sling the bob where you want it.
 Two modes from the start menu:
 - **Levels** — 20 numbered levels; thread the jiggly bob to the green **exit**.
   Tiles show locks, unlocks and earned **stars**, saved between runs. Every level
-  is guaranteed beatable on a **single life** (a no-hit route is BFS-verified).
+  is guaranteed beatable on a **single life** (a hazard-free route is verified).
 - **Survival** — endless arena: whip the bob through orbs for score + combo while
   the mine swarm keeps growing. The high score is tracked **per difficulty**.
 
@@ -17,13 +17,16 @@ Two modes from the start menu:
 **Obstacles**
 - **Walls** — solid *and* dangerous: touching one costs a life and bounces the bob.
 - **Static mines** — fixed red spikes.
-- **Moving mines** — patrol back and forth along corridors.
-- **Spinners** — rotating bars that sweep an area; time your passage.
+- **Moving mines** — patrol horizontally or vertically along their lane.
+- **Spinners** — short rotating bars that sweep an area; time your passage.
 - **Orbs** (cyan) — optional collectibles that help your star rating.
 
 Levels are authored as ASCII grids in `LEVELS` (top of `main.py`) — `#` wall,
-`S` start, `G` goal, `x`/`m` static/moving mine, `O` spinner, `*` orb. Every grid
-is BFS-checked for solvability before it loads, so a new level can't be a dead end.
+`S` start, `G` goal, `x` static mine, `h`/`v` horizontal/vertical moving mine,
+`O` spinner, `*` orb. Before a level loads, `hard_solvable()` verifies a fully
+**hazard-free route** exists (avoiding walls, static mines, each moving mine's
+whole patrol lane, and every spinner's reach) — so every level is genuinely
+beatable on **Hard (1 life)**, not just geometrically connected.
 
 
 ## Run on desktop (to test)
