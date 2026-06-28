@@ -11,6 +11,8 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write          # needed to publish a Release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,9 +59,16 @@ jobs:
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
 
-      - name: Upload APK
+      - name: Upload APK (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: tether-debug-apk
           path: bin/*.apk
           if-no-files-found: error
+
+      - name: Publish APK to "latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest debug build
+          files: bin/*.apk

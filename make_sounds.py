@@ -86,9 +86,22 @@ def start():
     return out
 
 
+def win():
+    # cheerful three-note arpeggio C-E-G-C
+    notes = [523.25, 659.25, 783.99, 1046.5]
+    seg = int(RATE * 0.10)
+    out = []
+    for n, f in enumerate(notes):
+        for i in range(seg):
+            s = 0.6 * sine(f, i) + 0.2 * sine(f * 2, i)
+            out.append(s * adsr(i, seg, 0.005, 0.6) * 0.55)
+    return out
+
+
 def main():
     random.seed(7)
-    for name, fn in (("pickup.wav", pickup), ("hit.wav", hit), ("start.wav", start)):
+    for name, fn in (("pickup.wav", pickup), ("hit.wav", hit),
+                     ("start.wav", start), ("win.wav", win)):
         p = _save(name, fn())
         print("wrote", p)
 

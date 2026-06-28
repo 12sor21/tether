@@ -1,9 +1,23 @@
 # Tether — mobile arcade game (Kivy)
 
 You drag the **ring** (anchor). A heavy **bob** hangs off it on a springy tether
-and swings, lags and overshoots. The bob is what collects cyan **orbs** (points +
-a rising combo) and what dies to red **mines**. You can't place the bob — you
-*whip* it: flick the anchor and let momentum sling the bob where you want it.
+and swings, lags and overshoots. You can't place the bob — you *whip* it: flick
+the anchor and let momentum sling the bob where you want it.
+
+Each **level** is a goal: thread the jiggly bob to the green **exit** without
+touching the walls or hazards. Flow is **Start menu → Level select → play**, with
+unlocked levels and earned **stars** saved between runs.
+
+**Obstacles**
+- **Walls** — solid *and* dangerous: touching one costs a life and bounces the bob.
+- **Static mines** — fixed red spikes.
+- **Moving mines** — patrol back and forth along corridors.
+- **Spinners** — rotating bars that sweep an area; time your passage.
+- **Orbs** (cyan) — optional collectibles that help your star rating.
+
+Levels are authored as ASCII grids in `LEVELS` (top of `main.py`) — `#` wall,
+`S` start, `G` goal, `x`/`m` static/moving mine, `O` spinner, `*` orb. Every grid
+is BFS-checked for solvability before it loads, so a new level can't be a dead end.
 
 
 ## Run on desktop (to test)
@@ -14,9 +28,9 @@ python main.py
 ```
 
 Drag with the mouse to steer. The game is **fully touch-driven — no keyboard is
-required** (tap to start / restart / resume, drag to steer, tap the ⏸ button to
-pause). Keyboard input is an optional desktop convenience only: arrows / WASD to
-steer, `P` to pause, `Space` to start/restart.
+required**: tap the on-screen buttons (Play, level tiles, Resume/Retry/Next),
+drag to steer, tap the ⏸ button to pause. Keyboard input is an optional desktop
+convenience only: arrows / WASD steer, `P` pauses.
 
 ## Regenerate art + sound
 
