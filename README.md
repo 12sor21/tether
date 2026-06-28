@@ -4,9 +4,15 @@ You drag the **ring** (anchor). A heavy **bob** hangs off it on a springy tether
 and swings, lags and overshoots. You can't place the bob — you *whip* it: flick
 the anchor and let momentum sling the bob where you want it.
 
-Each **level** is a goal: thread the jiggly bob to the green **exit** without
-touching the walls or hazards. Flow is **Start menu → Level select → play**, with
-unlocked levels and earned **stars** saved between runs.
+Two modes from the start menu:
+- **Levels** — 20 numbered levels; thread the jiggly bob to the green **exit**.
+  Tiles show locks, unlocks and earned **stars**, saved between runs. Every level
+  is guaranteed beatable on a **single life** (a no-hit route is BFS-verified).
+- **Survival** — endless arena: whip the bob through orbs for score + combo while
+  the mine swarm keeps growing. The high score is tracked **per difficulty**.
+
+**Difficulty** sets your lives and applies to both modes:
+**Easy 5 · Medium 3 · Hard 1** (chosen on the menu, saved between runs).
 
 **Obstacles**
 - **Walls** — solid *and* dangerous: touching one costs a life and bounces the bob.

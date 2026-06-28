@@ -4,21 +4,18 @@ TETHER  —  a one-thumb arcade game with jiggly tether physics.
 You drag the ANCHOR (the ring). A heavy BOB hangs off it on a springy tether and
 swings, lags and overshoots. You don't control the bob directly -- you *whip* it.
 
-Each LEVEL is a goal: thread the bob to the green exit without letting it touch
-the walls or hazards. Because the bob jiggles, tight corridors are a real test.
+Two modes:
+  * LEVELS    -- thread the bob to the green exit through walls and hazards.
+                 Numbered, with unlock + stars saved between runs. Every level is
+                 guaranteed beatable on a single life (a no-hit route exists).
+  * SURVIVAL  -- endless arena: whip the bob through orbs for score + combo while
+                 dodging an ever-growing swarm of mines.
 
-Obstacle types:
-    walls          solid + dangerous (touch = lose a life; the bob also bounces)
-    static mines   fixed red spikes
-    moving mines   patrol along corridors
-    spinners       rotating bars that sweep an area
+Difficulty sets your lives:  Easy 5  ·  Medium 3  ·  Hard 1   (applies to both modes).
 
-Flow:  START MENU -> LEVEL SELECT -> play a level -> CLEAR / FAILED.
-Progress (unlocked levels + stars) is saved between runs.
-
-Touch-only: tap buttons, drag to steer. Keyboard arrows also steer on desktop.
-Everything is drawn immediate-mode on a per-frame-cleared canvas, so no screen
-can ever "stick".  Package to Android with Buildozer (see README / buildozer.spec).
+Obstacle types: solid+dangerous walls, static mines, patrolling moving mines,
+rotating spinners.  Touch-only; everything is drawn immediate-mode on a
+per-frame-cleared canvas so no screen can stick.  Build to Android with Buildozer.
 """
 
 import math
@@ -37,6 +34,12 @@ from kivy.utils import platform
 # --- States -----------------------------------------------------------------
 MENU, SELECT, PLAYING, PAUSED, CLEAR, FAILED = \
     "menu", "select", "playing", "paused", "clear", "failed"
+LEVEL, SURVIVAL = "level", "survival"
+
+# --- Difficulty -------------------------------------------------------------
+DIFFS = ["easy", "medium", "hard"]
+DIFF_LIVES = {"easy": 5, "medium": 3, "hard": 1}
+DIFF_LABEL = {"easy": "Easy", "medium": "Medium", "hard": "Hard"}
 
 # --- Physics (fixed timestep) -----------------------------------------------
 STEP = 1.0 / 60.0
@@ -49,6 +52,15 @@ SPRING_K = 0.045
 SPRING_DAMP = 0.94
 TRAIL_LEN = 16
 IFRAMES = 70
+
+# --- Survival tuning --------------------------------------------------------
+S_ORB_MAX = 5
+S_ORB_SPAWN_EVERY = 42
+S_ORB_LIFETIME = 320
+S_MINE_START = 2
+S_MINE_MAX = 10
+S_MINE_RAMP_EVERY = 540
+S_COMBO_WINDOW = 150
 
 # --- Palette ----------------------------------------------------------------
 BG = (0.043, 0.055, 0.078)
@@ -72,29 +84,32 @@ TEXT_C = (0.9, 0.9, 0.9, 1)
 DIM_C = (0.66, 0.66, 0.66, 1)
 BTN_C = (0.13, 0.17, 0.25, 1)
 BTN_EDGE = (0.42, 0.52, 0.70, 1)
+BTN_SEL = (0.20, 0.30, 0.20, 1)
+BTN_SEL_EDGE = (0.42, 0.85, 0.45, 1)
 BTN_LOCK = (0.10, 0.12, 0.16, 1)
 STAR_C = (1.0, 0.82, 0.40, 1)
+COMBO_TXT = (0.204, 0.878, 0.878, 1)
 
 Window.clearcolor = (*BG, 1)
 
 # --- Levels (ASCII grids; rows top->bottom, all rows same width) ------------
-# '#' wall   '.' empty   'S' start   'G' goal
-# 'x' static mine   'm' moving mine   '*' orb   'O' spinner
+# '#' wall  '.' empty  'S' start  'G' goal
+# 'x' static mine  'm' moving mine  '*' orb  'O' spinner
 LEVELS = [
-    {"name": "First Steps", "lives": 5, "grid": [
+    {"name": "First Steps", "grid": [
         ".........",
         "...S.....",
         ".........",
-        "....x....",
+        ".....x...",
         ".........",
-        "...*..x..",
+        "...*.....",
+        ".......x.",
         ".........",
-        "......x..",
-        ".........",
+        "...x.....",
         ".....G...",
         ".........",
     ]},
-    {"name": "Detour", "lives": 5, "grid": [
+    {"name": "Detour", "grid": [
         ".........",
         ".S.......",
         ".....###.",
@@ -107,7 +122,7 @@ LEVELS = [
         "......G..",
         ".........",
     ]},
-    {"name": "Patrol", "lives": 5, "grid": [
+    {"name": "Patrol", "grid": [
         ".........",
         ".S.......",
         "....m....",
@@ -120,7 +135,7 @@ LEVELS = [
         "......G..",
         ".........",
     ]},
-    {"name": "The Maze", "lives": 6, "grid": [
+    {"name": "The Maze", "grid": [
         "#########",
         "#S......#",
         "#######.#",
@@ -133,9 +148,9 @@ LEVELS = [
         "#......G#",
         "#########",
     ]},
-    {"name": "Spikes & Halls", "lives": 6, "grid": [
+    {"name": "Spikes & Halls", "grid": [
         "#########",
-        "#S....x.#",
+        "#S......#",
         "#.#####.#",
         "#...m...#",
         "#.#####.#",
@@ -148,7 +163,7 @@ LEVELS = [
         "#x....G.#",
         "#########",
     ]},
-    {"name": "Gauntlet", "lives": 7, "grid": [
+    {"name": "Gauntlet", "grid": [
         ".........",
         ".S.......",
         "....O....",
@@ -162,44 +177,248 @@ LEVELS = [
         "......G..",
         ".........",
     ]},
+    {"name": "Slalom", "grid": [
+        ".........",
+        ".S.......",
+        "...#.....",
+        ".....m...",
+        ".#.....#.",
+        "....*....",
+        ".#.....#.",
+        "...m.....",
+        ".....#...",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Pinwheel", "grid": [
+        ".........",
+        ".S.......",
+        ".........",
+        "...O.....",
+        ".........",
+        "..x...x..",
+        ".....*...",
+        ".........",
+        ".....O...",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Switchback", "grid": [
+        "#########",
+        "#S......#",
+        "#.#######",
+        "#......m#",
+        "#######.#",
+        "#m......#",
+        "#.#######",
+        "#......m#",
+        "#######.#",
+        "#.......#",
+        "#.#######",
+        "#......G#",
+        "#########",
+    ]},
+    {"name": "Minefield", "grid": [
+        ".........",
+        ".S.......",
+        "...x.x...",
+        ".........",
+        ".x.....x.",
+        "....*....",
+        ".x.....x.",
+        ".........",
+        "...x.x...",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Twin Spins", "grid": [
+        ".........",
+        ".S.......",
+        "....O....",
+        ".........",
+        ".........",
+        "..*...*..",
+        ".........",
+        ".........",
+        "....O....",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Tight Squeeze", "grid": [
+        "#########",
+        "#......S#",
+        "#.#######",
+        "#.......#",
+        "#######.#",
+        "#.......#",
+        "#.#######",
+        "#.......#",
+        "#######.#",
+        "#.......#",
+        "#.#######",
+        "#G......#",
+        "#########",
+    ]},
+    {"name": "Box Step", "grid": [
+        ".........",
+        ".S.......",
+        "..##.....",
+        ".........",
+        ".....##..",
+        "...*.....",
+        "..##.....",
+        ".........",
+        ".....##..",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "The Comb", "grid": [
+        ".........",
+        ".S.......",
+        ".#.#.#.#.",
+        ".#.#.#.#.",
+        ".........",
+        "....*....",
+        ".#.#.#.#.",
+        ".#.#.#.#.",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Spinner Alley", "grid": [
+        ".........",
+        ".S.......",
+        ".........",
+        "..O.O.O..",
+        ".........",
+        "....*....",
+        ".........",
+        "..O.O.O..",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Zigzag", "grid": [
+        "#########",
+        "#S......#",
+        "#.#######",
+        "#...O...#",
+        "#######.#",
+        "#.......#",
+        "#.#######",
+        "#...O...#",
+        "#######.#",
+        "#.......#",
+        "#.#######",
+        "#......G#",
+        "#########",
+    ]},
+    {"name": "Bunkers", "grid": [
+        ".........",
+        ".S.......",
+        "..##.....",
+        "..##.x...",
+        ".........",
+        "...*.....",
+        "...x.##..",
+        ".....##..",
+        ".........",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "Gauntlet II", "grid": [
+        ".........",
+        ".S.......",
+        "...O.....",
+        ".........",
+        ".x.....x.",
+        "....*..m.",
+        ".x.....x.",
+        ".........",
+        ".....O...",
+        ".......G.",
+        ".........",
+    ]},
+    {"name": "The Cage", "grid": [
+        "#########",
+        "#......S#",
+        "#######.#",
+        "#m......#",
+        "#.#######",
+        "#......O#",
+        "#######.#",
+        "#m......#",
+        "#.#######",
+        "#......m#",
+        "#######.#",
+        "#G......#",
+        "#########",
+    ]},
+    {"name": "Final", "grid": [
+        "#########",
+        "#S......#",
+        "#.#######",
+        "#....O..#",
+        "#######.#",
+        "#..m....#",
+        "#.#######",
+        "#....m..#",
+        "#######.#",
+        "#..O....#",
+        "#.#######",
+        "#......G#",
+        "#########",
+    ]},
 ]
 
-PASSABLE = set(".SGxm*O")    # grid chars the bob may occupy (everything but '#')
+# bob may physically occupy any non-wall cell
+PASSABLE = set(".SGxm*O")
+# a NO-HIT route (1 life) must avoid walls AND static-mine cells
+SAFE = set(".SGm*O")
 
 
 def clamp(v, lo, hi):
     return lo if v < lo else hi if v > hi else v
 
 
-def solvable(grid):
-    """BFS from S to G through non-wall cells (4-connected). Used at load+test."""
-    rows, cols = len(grid), len(grid[0])
-    start = goal = None
+def _find(grid, ch):
     for i, row in enumerate(grid):
-        for j, ch in enumerate(row):
-            if ch == "S":
-                start = (i, j)
-            elif ch == "G":
-                goal = (i, j)
-    if not start or not goal:
+        j = row.find(ch)
+        if j >= 0:
+            return (i, j)
+    return None
+
+
+def _bfs(grid, passable):
+    rows, cols = len(grid), len(grid[0])
+    s, g = _find(grid, "S"), _find(grid, "G")
+    if not s or not g:
         return False
-    seen = {start}
-    q = deque([start])
+    seen, q = {s}, deque([s])
     while q:
         i, j = q.popleft()
-        if (i, j) == goal:
+        if (i, j) == g:
             return True
         for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             ni, nj = i + di, j + dj
             if 0 <= ni < rows and 0 <= nj < cols and (ni, nj) not in seen \
-                    and grid[ni][nj] in PASSABLE:
+                    and grid[ni][nj] in passable:
                 seen.add((ni, nj))
                 q.append((ni, nj))
     return False
 
 
+def solvable(grid):
+    """Connectivity through any non-wall cell."""
+    return _bfs(grid, PASSABLE)
+
+
+def no_hit_solvable(grid):
+    """A route exists avoiding walls AND static mines -> beatable on 1 life."""
+    return _bfs(grid, SAFE)
+
+
 class MovingMine:
-    """Patrols along one axis, reversing at walls / bounds."""
     __slots__ = ("x", "y", "vx", "vy")
 
     def __init__(self, x, y, vx, vy):
@@ -241,10 +460,14 @@ class GameWidget(Widget):
         self.store = store
         self.sounds = sounds
         self.progress = self._load_progress()
+        self.difficulty = self.store.get("diff")["v"] \
+            if self.store.exists("diff") else "medium"
+        self.best = self._load_best()    # per-difficulty: {"easy": n, ...}
 
         self.state = MENU
+        self.mode = LEVEL
         self.level_idx = 0
-        self.cur = None            # loaded level (cell data)
+        self.cur = None
         self.held = set()
         self.steering = False
         self._steer_touch = None
@@ -253,11 +476,26 @@ class GameWidget(Widget):
         self.shake = 0.0
         self._tex_cache = {}
         self._buttons = []
+        self._tiles = []
         self._ready = False
 
         Window.bind(on_key_down=self._key_down, on_key_up=self._key_up)
         Clock.schedule_interval(self.tick, 0)
         self.bind(size=lambda *a: self._on_size())
+
+    def lives_for_difficulty(self):
+        return DIFF_LIVES[self.difficulty]
+
+    def _load_best(self):
+        if self.store.exists("best"):
+            v = self.store.get("best").get("v")
+            if isinstance(v, dict):
+                return {k: int(n) for k, n in v.items()}
+        return {}
+
+    def best_cur(self):
+        """Survival best for the CURRENTLY selected difficulty."""
+        return int(self.best.get(self.difficulty, 0))
 
     # --- Persistence --------------------------------------------------------
     def _load_progress(self):
@@ -285,16 +523,16 @@ class GameWidget(Widget):
         self._tex_cache.clear()
         if self.cur:
             self._layout_level()
+        self._survival_geom()
         if w > 1 and h > 1:
             self._ready = True
 
     def _layout_level(self):
         rows, cols = self.cur["rows"], self.cur["cols"]
         x0, y0 = self.margin, self.margin
-        pw, ph = self.width - 2 * self.margin, self.height - 2 * self.margin
-        # reserve a strip at the top for the HUD
-        ph -= self.scale * 0.06
-        cell = min(pw / cols, ph / cols if False else ph / rows)
+        pw = self.width - 2 * self.margin
+        ph = self.height - 2 * self.margin - self.scale * 0.06
+        cell = min(pw / cols, ph / rows)
         self.cell = cell
         gw, gh = cell * cols, cell * rows
         self.gx0 = x0 + (pw - gw) / 2
@@ -305,6 +543,13 @@ class GameWidget(Widget):
         self.r_orb = cell * 0.20
         self.r_goal = cell * 0.46
         self.bob_vmax = cell * 0.7
+
+    def _survival_geom(self):
+        s = self.scale
+        self.sr_bob = s * 0.030
+        self.sr_anchor = s * 0.016
+        self.sr_orb = s * 0.022
+        self.sr_mine = s * 0.026
 
     def cell_rect(self, i, j):
         ry = self.gy0 + (self.cur["rows"] - 1 - i) * self.cell
@@ -328,15 +573,10 @@ class GameWidget(Widget):
         grid = spec["grid"]
         rows, cols = len(grid), len(grid[0])
         walls, statics, movers, orbs, spinners = set(), [], [], [], []
-        start = goal = None
         for i, row in enumerate(grid):
             for j, ch in enumerate(row):
                 if ch == "#":
                     walls.add((i, j))
-                elif ch == "S":
-                    start = (i, j)
-                elif ch == "G":
-                    goal = (i, j)
                 elif ch == "x":
                     statics.append((i, j))
                 elif ch == "m":
@@ -345,31 +585,29 @@ class GameWidget(Widget):
                     orbs.append((i, j))
                 elif ch == "O":
                     spinners.append((i, j))
-        self.cur = {"name": spec["name"], "lives": spec["lives"], "grid": grid,
-                    "rows": rows, "cols": cols, "walls": walls, "start": start,
-                    "goal": goal, "statics": statics, "movers": movers,
-                    "orbs": orbs, "spinners": spinners}
+        self.cur = {"name": spec["name"], "grid": grid, "rows": rows, "cols": cols,
+                    "walls": walls, "start": _find(grid, "S"), "goal": _find(grid, "G"),
+                    "statics": statics, "movers": movers, "orbs": orbs,
+                    "spinners": spinners}
         self.level_idx = idx
         self._layout_level()
 
     def start_level(self, idx):
+        self.mode = LEVEL
         self.load_level(idx)
         c = self.cur
         sx, sy = self.cell_center(*c["start"])
         self.ax, self.ay = sx, sy
         self.avx = self.avy = 0.0
-        self.bx, self.by = sx, sy          # bob starts on the anchor (safe in-cell)
+        self.bx, self.by = sx, sy
         self.bvx = self.bvy = 0.0
         self.trail = []
-        self.lives = c["lives"]
-        self.iframes = 0
-        self.flash = 0
-        self.steps = 0
-        self.collected = 0
+        self.lives = self.lives_for_difficulty()
+        self.iframes = self.flash = 0
+        self.steps = self.collected = 0
         self.steering = False
         self._steer_touch = None
 
-        # runtime hazards
         self.mmines = []
         for (i, j) in c["movers"]:
             cx, cy = self.cell_center(i, j)
@@ -391,9 +629,44 @@ class GameWidget(Widget):
         self.orbs = [{"x": self.cell_center(i, j)[0], "y": self.cell_center(i, j)[1],
                       "got": False} for (i, j) in c["orbs"]]
         self.goal_xy = self.cell_center(*c["goal"])
-
         self.state = PLAYING
         self.sounds.play("start")
+
+    # --- Survival start -----------------------------------------------------
+    def start_survival(self):
+        self.mode = SURVIVAL
+        self.cur = None
+        self._survival_geom()
+        cx, cy = self.width / 2, self.height / 2
+        self.ax, self.ay = cx, cy
+        self.avx = self.avy = 0.0
+        self.bx, self.by = cx, cy - self.scale * 0.10
+        self.bvx = self.bvy = 0.0
+        self.trail = []
+        self.lives = self.lives_for_difficulty()
+        self.iframes = self.flash = 0
+        self.steps = self.orb_timer = 0
+        self.score = 0
+        self.combo = 1
+        self.combo_timer = 0
+        self.steering = False
+        self._steer_touch = None
+        self.smines = [self._survival_mine() for _ in range(S_MINE_START)]
+        self.sorbs = []
+        self.state = PLAYING
+        self.sounds.play("start")
+
+    def _survival_mine(self):
+        m = self.margin
+        rr = self.sr_mine
+        for _ in range(40):
+            x = random.uniform(m + rr, self.width - m - rr)
+            y = random.uniform(m + rr, self.height - m - rr)
+            if math.hypot(x - self.bx, y - self.by) > self.scale * 0.25:
+                break
+        ang = random.uniform(0, math.tau)
+        spd = random.uniform(0.6, 1.6) * self.sf
+        return MovingMine(x, y, math.cos(ang) * spd, math.sin(ang) * spd)
 
     # --- Input --------------------------------------------------------------
     def on_touch_down(self, touch):
@@ -430,6 +703,8 @@ class GameWidget(Widget):
     def _do(self, action):
         if action == "play":
             self.state = SELECT
+        elif action == "survival":
+            self.start_survival()
         elif action == "menu":
             self.state = MENU
         elif action == "select":
@@ -439,20 +714,28 @@ class GameWidget(Widget):
         elif action == "pause":
             self.state = PAUSED
         elif action == "retry":
-            self.start_level(self.level_idx)
+            if self.mode == SURVIVAL:
+                self.start_survival()
+            else:
+                self.start_level(self.level_idx)
         elif action == "next":
-            nxt = self.level_idx + 1
-            if nxt < len(LEVELS):
-                self.start_level(nxt)
+            if self.level_idx + 1 < len(LEVELS):
+                self.start_level(self.level_idx + 1)
             else:
                 self.state = SELECT
+        elif action.startswith("diff:"):
+            self.difficulty = action.split(":")[1]
+            try:
+                self.store.put("diff", v=self.difficulty)
+            except Exception:
+                pass
         elif action.startswith("level:"):
             idx = int(action.split(":")[1])
             if idx < self.progress["unlocked"]:
                 self.start_level(idx)
 
     def _key_down(self, win, key, scancode, codepoint, modifier):
-        if key == 112 and self.state in (PLAYING, PAUSED):       # P
+        if key == 112 and self.state in (PLAYING, PAUSED):
             self.state = PAUSED if self.state == PLAYING else PLAYING
             return
         self.held.add(key)
@@ -482,21 +765,17 @@ class GameWidget(Widget):
             self.accum += min(dt, STEP * MAX_STEPS)
             n = 0
             while self.accum >= STEP and n < MAX_STEPS:
-                self.physics_step()
+                if self.mode == SURVIVAL:
+                    self.step_survival()
+                else:
+                    self.step_level()
                 self.accum -= STEP
                 n += 1
                 if self.state != PLAYING:
                     break
         self.render()
 
-    def physics_step(self):
-        self.steps += 1
-        x0 = self.gx0
-        y0 = self.gy0
-        x1 = self.gx0 + self.cell * self.cur["cols"]
-        y1 = self.gy0 + self.cell * self.cur["rows"]
-
-        # Anchor: keyboard + touch-seek.
+    def _move_anchor(self, x0, y0, x1, y1):
         thx, thy = self._keyboard_thrust()
         if self.steering:
             dx, dy = self.target[0] - self.ax, self.target[1] - self.ay
@@ -510,7 +789,24 @@ class GameWidget(Widget):
         self.ax = clamp(self.ax + self.avx, x0, x1)
         self.ay = clamp(self.ay + self.avy, y0, y1)
 
-        # Bob: damped spring toward anchor (velocity capped to avoid tunneling).
+    def _decay_fx(self):
+        if self.iframes > 0:
+            self.iframes -= 1
+        if self.flash > 0:
+            self.flash -= 1
+        if self.shake > 0:
+            self.shake *= 0.85
+            if self.shake < 0.5:
+                self.shake = 0
+
+    # --- Level physics ------------------------------------------------------
+    def step_level(self):
+        self.steps += 1
+        x0, y0 = self.gx0, self.gy0
+        x1 = self.gx0 + self.cell * self.cur["cols"]
+        y1 = self.gy0 + self.cell * self.cur["rows"]
+        self._move_anchor(x0, y0, x1, y1)
+
         self.bvx = (self.bvx + (self.ax - self.bx) * SPRING_K) * SPRING_DAMP
         self.bvy = (self.bvy + (self.ay - self.by) * SPRING_K) * SPRING_DAMP
         sp = math.hypot(self.bvx, self.bvy)
@@ -520,7 +816,6 @@ class GameWidget(Widget):
         self.bx += self.bvx
         self.by += self.bvy
 
-        # Outer bounds: harmless bounce (keeps the bob on screen).
         rb = self.r_bob
         if self.bx < x0 + rb:
             self.bx, self.bvx = x0 + rb, abs(self.bvx) * 0.5
@@ -531,28 +826,25 @@ class GameWidget(Widget):
         elif self.by > y1 - rb:
             self.by, self.bvy = y1 - rb, -abs(self.bvy) * 0.5
 
-        # Walls: solid + damaging (check the bob's cell neighbourhood only).
         ci, cj = self.pixel_cell(self.bx, self.by)
-        touched_wall = False
+        touched = False
         for di in (-1, 0, 1):
             for dj in (-1, 0, 1):
                 if (ci + di, cj + dj) in self.cur["walls"]:
                     if self._collide_rect(self.cell_rect(ci + di, cj + dj)):
-                        touched_wall = True
-        if touched_wall:
+                        touched = True
+        if touched:
             self._hurt()
 
         self.trail.append((self.bx, self.by))
         if len(self.trail) > TRAIL_LEN:
             self.trail.pop(0)
 
-        # Static mines.
         for (i, j) in self.cur["statics"]:
             mx, my = self.cell_center(i, j)
             if math.hypot(mx - self.bx, my - self.by) < rb + self.r_mine:
                 self._hurt(mx, my)
 
-        # Moving mines.
         for m in self.mmines:
             m.x += m.vx
             m.y += m.vy
@@ -565,7 +857,6 @@ class GameWidget(Widget):
             if math.hypot(m.x - self.bx, m.y - self.by) < rb + self.r_mine:
                 self._hurt(m.x, m.y)
 
-        # Spinners.
         for s in self.spinners:
             s["ang"] += s["spd"]
             ex = s["cx"] + math.cos(s["ang"]) * s["len"]
@@ -574,26 +865,89 @@ class GameWidget(Widget):
                     < rb + self.cell * 0.10:
                 self._hurt(s["cx"], s["cy"])
 
-        # Orbs.
         for o in self.orbs:
             if not o["got"] and math.hypot(o["x"] - self.bx, o["y"] - self.by) < rb + self.r_orb:
                 o["got"] = True
                 self.collected += 1
                 self.sounds.play("pickup", volume=0.7)
 
-        # Goal.
         if math.hypot(self.goal_xy[0] - self.bx, self.goal_xy[1] - self.by) < self.r_goal:
             self._level_clear()
+        self._decay_fx()
 
-        if self.iframes > 0:
-            self.iframes -= 1
-        if self.flash > 0:
-            self.flash -= 1
-        if self.shake > 0:
-            self.shake *= 0.85
-            if self.shake < 0.5:
-                self.shake = 0
+    # --- Survival physics ---------------------------------------------------
+    def step_survival(self):
+        self.steps += 1
+        m = self.margin
+        x0, y0, x1, y1 = m, m, self.width - m, self.height - m
+        self._move_anchor(x0, y0, x1, y1)
+        rb = self.sr_bob
 
+        self.bvx = (self.bvx + (self.ax - self.bx) * SPRING_K) * SPRING_DAMP
+        self.bvy = (self.bvy + (self.ay - self.by) * SPRING_K) * SPRING_DAMP
+        self.bx += self.bvx
+        self.by += self.bvy
+        if self.bx < x0 + rb or self.bx > x1 - rb:
+            self.bvx *= -0.6
+            self.bx = clamp(self.bx, x0 + rb, x1 - rb)
+        if self.by < y0 + rb or self.by > y1 - rb:
+            self.bvy *= -0.6
+            self.by = clamp(self.by, y0 + rb, y1 - rb)
+
+        self.trail.append((self.bx, self.by))
+        if len(self.trail) > TRAIL_LEN:
+            self.trail.pop(0)
+
+        self.orb_timer += 1
+        if self.orb_timer >= S_ORB_SPAWN_EVERY and len(self.sorbs) < S_ORB_MAX:
+            self.orb_timer = 0
+            ox = random.uniform(x0 + self.sr_orb, x1 - self.sr_orb)
+            oy = random.uniform(y0 + self.sr_orb, y1 - self.sr_orb)
+            self.sorbs.append({"x": ox, "y": oy, "life": S_ORB_LIFETIME})
+
+        if self.steps % S_MINE_RAMP_EVERY == 0 and len(self.smines) < S_MINE_MAX:
+            self.smines.append(self._survival_mine())
+
+        for o in self.sorbs:
+            o["life"] -= 1
+        self.sorbs = [o for o in self.sorbs if o["life"] > 0]
+
+        if self.combo_timer > 0:
+            self.combo_timer -= 1
+            if self.combo_timer == 0:
+                self.combo = 1
+
+        kept = []
+        for o in self.sorbs:
+            if math.hypot(o["x"] - self.bx, o["y"] - self.by) < rb + self.sr_orb:
+                self.combo = min(self.combo + 1, 9) if self.combo_timer > 0 else 2
+                self.combo_timer = S_COMBO_WINDOW
+                self.score += 10 * self.combo
+                self.flash = 6
+                self.sounds.play("pickup", volume=0.7)
+            else:
+                kept.append(o)
+        self.sorbs = kept
+
+        for mm in self.smines:
+            mm.x += mm.vx
+            mm.y += mm.vy
+            if mm.x < x0 + self.sr_mine or mm.x > x1 - self.sr_mine:
+                mm.vx *= -1
+                mm.x = clamp(mm.x, x0 + self.sr_mine, x1 - self.sr_mine)
+            if mm.y < y0 + self.sr_mine or mm.y > y1 - self.sr_mine:
+                mm.vy *= -1
+                mm.y = clamp(mm.y, y0 + self.sr_mine, y1 - self.sr_mine)
+        if self.iframes <= 0:
+            for mm in self.smines:
+                if math.hypot(mm.x - self.bx, mm.y - self.by) < rb + self.sr_mine:
+                    self.combo = 1
+                    self.combo_timer = 0
+                    self._hurt(mm.x, mm.y)
+                    break
+        self._decay_fx()
+
+    # --- Collision helpers --------------------------------------------------
     def _collide_rect(self, rect):
         rx, ry, rw, rh = rect
         nx = clamp(self.bx, rx, rx + rw)
@@ -608,13 +962,12 @@ class GameWidget(Widget):
             push = rb - d
             self.bx += dx / d * push
             self.by += dy / d * push
-            # reflect velocity along the contact normal
             nxn, nyn = dx / d, dy / d
             dot = self.bvx * nxn + self.bvy * nyn
             self.bvx -= 1.5 * dot * nxn
             self.bvy -= 1.5 * dot * nyn
         else:
-            self.by += rb   # degenerate: nudge upward
+            self.by += rb
         return True
 
     @staticmethod
@@ -636,22 +989,27 @@ class GameWidget(Widget):
         self.sounds.play("hit")
         if hx is not None:
             ang = math.atan2(self.by - hy, self.bx - hx)
-            self.bvx += math.cos(ang) * 6 * self.sf
-            self.bvy += math.sin(ang) * 6 * self.sf
+            kick = 6 * (self.sf if self.mode == SURVIVAL else 1.0)
+            self.bvx += math.cos(ang) * kick
+            self.bvy += math.sin(ang) * kick
         if self.lives <= 0:
-            self.state = FAILED
+            self._game_over()
+
+    def _game_over(self):
+        if self.mode == SURVIVAL and self.score > self.best_cur():
+            self.best[self.difficulty] = self.score
+            try:
+                self.store.put("best", v=self.best)
+            except Exception:
+                pass
+        self.state = FAILED
 
     def _level_clear(self):
         self.state = CLEAR
-        total = len(self.orbs)
-        stars = 1
-        if self.lives >= self.cur["lives"]:
-            stars = 3
-        elif self.lives >= max(2, self.cur["lives"] - 2):
-            stars = 2
-        if total and self.collected >= total and stars < 3:
-            stars += 1
-        stars = min(3, stars)
+        base = {"easy": 1, "medium": 2, "hard": 3}[self.difficulty]
+        if self.orbs and self.collected >= len(self.orbs) and base < 3:
+            base += 1
+        stars = min(3, base)
         self.last_stars = stars
         prev = self.progress["stars"].get(self.level_idx, 0)
         self.progress["stars"][self.level_idx] = max(prev, stars)
@@ -692,21 +1050,37 @@ class GameWidget(Widget):
         Rectangle(texture=t, pos=pos, size=(w, h))
 
     # --- Buttons ------------------------------------------------------------
-    def _btn(self, x, y, w, h, label, action, enabled=True, fs=None, locked=False):
+    def _btn(self, x, y, w, h, label, action, enabled=True, fs=None,
+             locked=False, sel=False):
         self._buttons.append({"x": x, "y": y, "w": w, "h": h, "label": label,
                               "action": action, "enabled": enabled,
-                              "fs": fs or self.scale * 0.040, "locked": locked})
+                              "fs": fs or self.scale * 0.040, "locked": locked,
+                              "sel": sel})
 
     def _draw_buttons(self):
         for b in self._buttons:
-            fill = BTN_LOCK if b["locked"] else BTN_C
+            if b["locked"]:
+                fill, edge = BTN_LOCK, DIM_C
+            elif b["sel"]:
+                fill, edge = BTN_SEL, BTN_SEL_EDGE
+            else:
+                fill, edge = BTN_C, BTN_EDGE
             Color(*fill)
             Rectangle(pos=(b["x"], b["y"]), size=(b["w"], b["h"]))
-            Color(*(DIM_C if b["locked"] else BTN_EDGE))
+            Color(*edge)
             Line(rectangle=(b["x"], b["y"], b["w"], b["h"]), width=1.4)
             if b["label"]:
                 self._text(b["label"], b["x"] + b["w"] / 2, b["y"] + b["h"] / 2,
                            b["fs"], DIM_C if b["locked"] else TEXT_C, bold=True)
+
+    def _lock(self, cx, cy, sz):
+        Color(*DIM_C)
+        bw, bh = sz, sz * 0.72
+        Rectangle(pos=(cx - bw / 2, cy - bh / 2), size=(bw, bh))
+        top = cy + bh / 2
+        sh = sz * 0.30
+        Line(points=[cx - sz * 0.22, top, cx - sz * 0.22, top + sh,
+                     cx + sz * 0.22, top + sh, cx + sz * 0.22, top], width=1.6)
 
     # --- Rendering ----------------------------------------------------------
     def render(self):
@@ -729,8 +1103,12 @@ class GameWidget(Widget):
                 Line(points=[0, y, w, y], width=1)
                 y += g
 
-            if self.state in (PLAYING, PAUSED, CLEAR, FAILED) and self.cur:
-                self._draw_level()
+            if self.state in (PLAYING, PAUSED, CLEAR, FAILED):
+                if self.mode == SURVIVAL:
+                    self._draw_survival()
+                elif self.cur:
+                    self._draw_level()
+
             if self.state == MENU:
                 self._draw_menu()
             elif self.state == SELECT:
@@ -739,30 +1117,33 @@ class GameWidget(Widget):
                 self._draw_play_hud()
             elif self.state == PAUSED:
                 self._overlay("PAUSED", None)
-                self._stack_buttons(["Resume", "Retry", "Levels"],
-                                    ["resume", "retry", "select"])
+                self._stack(["Resume", "Retry", "Menu"], ["resume", "retry", "menu"])
             elif self.state == CLEAR:
                 self._overlay("LEVEL CLEAR", None, stars=getattr(self, "last_stars", 0))
-                has_next = self.level_idx + 1 < len(LEVELS)
-                labels = (["Next", "Retry", "Levels"] if has_next
-                          else ["Retry", "Levels"])
-                acts = (["next", "retry", "select"] if has_next
-                        else ["retry", "select"])
-                self._stack_buttons(labels, acts)
+                nx = self.level_idx + 1 < len(LEVELS)
+                self._stack(["Next", "Retry", "Levels"] if nx else ["Retry", "Levels"],
+                            ["next", "retry", "select"] if nx else ["retry", "select"])
             elif self.state == FAILED:
-                self._overlay("FAILED", "The bob couldn't make it.")
-                self._stack_buttons(["Retry", "Levels"], ["retry", "select"])
+                if self.mode == SURVIVAL:
+                    self._overlay("GAME OVER",
+                                  f"Score {self.score}    Best {self.best_cur()}  "
+                                  f"({DIFF_LABEL[self.difficulty]})")
+                    self._stack(["Retry", "Menu"], ["retry", "menu"])
+                else:
+                    self._overlay("FAILED", "The bob couldn't make it.")
+                    self._stack(["Retry", "Levels"], ["retry", "select"])
             self._draw_buttons()
+            # Tile decorations (numbers/stars/locks) go ON TOP of the button fills.
+            if self.state == SELECT:
+                self._draw_tile_overlay()
 
-    # ----- world
+    # ----- world: level
     def _draw_level(self):
         ox = oy = 0.0
         if self.shake:
             ox = random.uniform(-self.shake, self.shake)
             oy = random.uniform(-self.shake, self.shake)
         s, cell = self.scale, self.cell
-
-        # walls
         for (i, j) in self.cur["walls"]:
             rx, ry, c, _ = self.cell_rect(i, j)
             Color(*WALL_C)
@@ -770,7 +1151,6 @@ class GameWidget(Widget):
             Color(*WALL_EDGE)
             Line(rectangle=(rx + ox, ry + oy, c, c), width=1.2)
 
-        # goal
         gx, gy = self.goal_xy
         pulse = 1 + 0.12 * math.sin(self.steps * 0.12)
         Color(*GOAL_DIM)
@@ -779,7 +1159,6 @@ class GameWidget(Widget):
         Line(circle=(gx + ox, gy + oy, self.r_goal * pulse), width=2.2)
         self._disc(gx + ox, gy + oy, self.r_goal * 0.30)
 
-        # orbs
         for o in self.orbs:
             if o["got"]:
                 continue
@@ -788,16 +1167,11 @@ class GameWidget(Widget):
             Color(*ORB_C)
             self._disc(o["x"] + ox, o["y"] + oy, self.r_orb)
 
-        # static mines
         for (i, j) in self.cur["statics"]:
             mx, my = self.cell_center(i, j)
-            self._mine(mx + ox, my + oy)
-
-        # moving mines
+            self._mine(mx + ox, my + oy, self.r_mine)
         for m in self.mmines:
-            self._mine(m.x + ox, m.y + oy)
-
-        # spinners
+            self._mine(m.x + ox, m.y + oy, self.r_mine)
         for sp in self.spinners:
             ex = sp["cx"] + math.cos(sp["ang"]) * sp["len"]
             ey = sp["cy"] + math.sin(sp["ang"]) * sp["len"]
@@ -808,95 +1182,153 @@ class GameWidget(Widget):
             Color(*MINE_CORE)
             self._disc(sp["cx"] + ox, sp["cy"] + oy, cell * 0.14)
 
-        # tether + trail + bob + anchor
+        self._draw_bob(ox, oy, self.r_bob, self.r_anchor)
+
+    # ----- world: survival
+    def _draw_survival(self):
+        ox = oy = 0.0
+        if self.shake:
+            ox = random.uniform(-self.shake, self.shake)
+            oy = random.uniform(-self.shake, self.shake)
+        s = self.scale
+        for o in self.sorbs:
+            frac = o["life"] / S_ORB_LIFETIME
+            r = self.sr_orb * (0.55 + 0.45 * frac) * (1 + 0.18 * math.sin(self.steps * 0.2))
+            Color(*ORB_DIM)
+            self._disc(o["x"] + ox, o["y"] + oy, r + s * 0.006)
+            Color(*(ORB_C if frac > 0.35 else ORB_DIM))
+            self._disc(o["x"] + ox, o["y"] + oy, r)
+        for mm in self.smines:
+            self._mine(mm.x + ox, mm.y + oy, self.sr_mine)
+        self._draw_bob(ox, oy, self.sr_bob, self.sr_anchor)
+
+    def _draw_bob(self, ox, oy, rb, ra):
+        s = self.scale
         Color(*TETHER_C)
         Line(points=[self.ax + ox, self.ay + oy, self.bx + ox, self.by + oy],
              width=max(1.2, s * 0.004))
         n = len(self.trail)
         for k, (tx, ty) in enumerate(self.trail):
             Color(*BOB_GLOW)
-            self._disc(tx + ox, ty + oy, self.r_bob * (0.25 + 0.5 * (k / max(n, 1))))
+            self._disc(tx + ox, ty + oy, rb * (0.25 + 0.5 * (k / max(n, 1))))
         blink = self.iframes > 0 and (self.iframes // 5) % 2 == 0
         Color(*BOB_GLOW)
-        self._disc(self.bx + ox, self.by + oy, self.r_bob + s * 0.008)
+        self._disc(self.bx + ox, self.by + oy, rb + s * 0.008)
         Color(*(BOB_HIT if blink else BOB_C))
-        self._disc(self.bx + ox, self.by + oy, self.r_bob)
+        self._disc(self.bx + ox, self.by + oy, rb)
         if self.flash > 0:
             Color(*MINE_C)
-            Line(circle=(self.bx + ox, self.by + oy, self.r_bob + s * 0.012 + self.flash),
-                 width=2)
+            Line(circle=(self.bx + ox, self.by + oy, rb + s * 0.012 + self.flash), width=2)
         Color(*ANCHOR_C)
-        Line(circle=(self.ax + ox, self.ay + oy, self.r_anchor), width=max(2, s * 0.006))
+        Line(circle=(self.ax + ox, self.ay + oy, ra), width=max(2, s * 0.006))
 
     def _disc(self, x, y, r):
         Ellipse(pos=(x - r, y - r), size=(2 * r, 2 * r))
 
-    def _mine(self, x, y):
+    def _mine(self, x, y, r):
         Color(*MINE_CORE)
-        self._disc(x, y, self.r_mine + self.scale * 0.004)
+        self._disc(x, y, r + self.scale * 0.004)
         Color(*MINE_C)
-        self._disc(x, y, self.r_mine)
+        self._disc(x, y, r)
         Color(*MINE_CORE)
-        self._disc(x, y, self.r_mine * 0.42)
+        self._disc(x, y, r * 0.42)
 
     # ----- HUD / menus
     def _draw_play_hud(self):
         s, m = self.scale, self.margin
-        self._text(self.cur["name"], self.width / 2, self.height - m - s * 0.02,
-                   s * 0.034, TEXT_C, bold=True)
-        # lives as bob-pips, top-left
+        if self.mode == SURVIVAL:
+            self._text(f"Score {self.score}", m * 1.3, self.height - m,
+                       s * 0.045, TEXT_C, bold=True, anchor="tl")
+            self._text(f"Best {self.best_cur()}", m * 1.3, self.height - m - s * 0.055,
+                       s * 0.028, DIM_C, anchor="tl")
+            if self.combo > 1:
+                self._text(f"x{self.combo}", self.width / 2, self.height - m - s * 0.02,
+                           s * 0.05, COMBO_TXT, bold=True)
+        else:
+            self._text(f"{self.level_idx + 1}.  {self.cur['name']}", self.width / 2,
+                       self.height - m - s * 0.02, s * 0.034, TEXT_C, bold=True)
+            if self.orbs:
+                self._text(f"orbs {self.collected}/{len(self.orbs)}", m * 1.3,
+                           self.height - m - s * 0.07, s * 0.026, ORB_C, anchor="tl")
         for i in range(self.lives):
             Color(*BOB_C)
-            self._disc(m * 1.5 + i * s * 0.05, self.height - m - s * 0.03, s * 0.016)
-        if self.orbs:
-            self._text(f"orbs {self.collected}/{len(self.orbs)}", m * 1.3,
-                       self.height - m - s * 0.07, s * 0.026, ORB_C, anchor="tl")
-        # pause button (top-right)
+            self._disc(m * 1.5 + i * s * 0.05, self.height - m - s * 0.035, s * 0.016)
         bs = s * 0.075
-        x = self.width - m - bs
-        y = self.height - m - bs
-        self._btn(x, y, bs, bs, "II", "pause", fs=s * 0.035)
+        self._btn(self.width - m - bs, self.height - m - bs, bs, bs, "II",
+                  "pause", fs=s * 0.035)
+
+    def _diff_row(self, cy):
+        w, s = self.width, self.scale
+        bw = w * 0.26
+        gap = w * 0.02
+        total = 3 * bw + 2 * gap
+        x = w / 2 - total / 2
+        for d in DIFFS:
+            self._btn(x, cy, bw, s * 0.075, DIFF_LABEL[d], f"diff:{d}",
+                      fs=s * 0.03, sel=(d == self.difficulty))
+            x += bw + gap
 
     def _draw_menu(self):
         w, h, s = self.width, self.height, self.scale
-        self._text("TETHER", w / 2, h * 0.66, s * 0.13, TITLE_C, bold=True)
-        self._text("Whip the jiggly bob to the exit.\nMind the walls.",
-                   w / 2, h * 0.54, s * 0.032, TEXT_C, mw=w * 0.8)
-        bw, bh = w * 0.5, s * 0.10
-        self._btn(w / 2 - bw / 2, h * 0.36, bw, bh, "PLAY", "play", fs=s * 0.05)
+        self._text("TETHER", w / 2, h * 0.78, s * 0.13, TITLE_C, bold=True)
+        self._text("Whip the jiggly bob to the exit. Mind the walls.",
+                   w / 2, h * 0.69, s * 0.030, TEXT_C, mw=w * 0.86)
+        self._text(f"Difficulty  ·  {DIFF_LIVES[self.difficulty]} lives",
+                   w / 2, h * 0.605, s * 0.030, DIM_C)
+        self._diff_row(h * 0.55 - s * 0.0375)
+        bw, bh = w * 0.56, s * 0.095
+        self._btn(w / 2 - bw / 2, h * 0.40, bw, bh, "PLAY  LEVELS", "play", fs=s * 0.045)
+        self._btn(w / 2 - bw / 2, h * 0.28, bw, bh, "SURVIVAL", "survival", fs=s * 0.045)
         done = sum(self.progress["stars"].values())
         self._text(f"{self.progress['unlocked']}/{len(LEVELS)} levels  ·  "
-                   f"{done}/{len(LEVELS) * 3} stars",
-                   w / 2, h * 0.27, s * 0.026, DIM_C)
+                   f"{done}/{len(LEVELS) * 3} stars  ·  "
+                   f"survival best {self.best_cur()} ({DIFF_LABEL[self.difficulty]})",
+                   w / 2, h * 0.17, s * 0.024, DIM_C, mw=w * 0.92)
 
     def _draw_select(self):
         w, h, s = self.width, self.height, self.scale
-        self._text("SELECT LEVEL", w / 2, h - self.margin - s * 0.06,
-                   s * 0.055, TITLE_C, bold=True)
-        cols = 3
+        self._text("SELECT LEVEL", w / 2, h - self.margin - s * 0.045,
+                   s * 0.048, TITLE_C, bold=True)
+        self._text(f"{DIFF_LABEL[self.difficulty]}  ·  "
+                   f"{DIFF_LIVES[self.difficulty]} lives",
+                   w / 2, h - self.margin - s * 0.095, s * 0.026, DIM_C)
+        self._diff_row(h * 0.80)
+        # Fit a 4-wide grid of all levels inside the available box, sizing the
+        # tiles by BOTH width and height so they never overflow on any aspect.
+        cols = 4
         rows = (len(LEVELS) + cols - 1) // cols
-        gap = w * 0.04
-        bw = (w * 0.84 - gap * (cols - 1)) / cols
-        bh = bw * 0.92
-        x0 = w * 0.08
-        ytop = h * 0.74
+        gap = min(w, h) * 0.02
+        menu_h = s * 0.075
+        ytop = h * 0.72
+        ybot = h * 0.045 + menu_h + gap
+        w_av = w * 0.92
+        h_av = ytop - ybot
+        tile = min((w_av - (cols - 1) * gap) / cols,
+                   (h_av - (rows - 1) * gap) / rows)
+        grid_w = cols * tile + (cols - 1) * gap
+        gx0 = (w - grid_w) / 2
+        self._tiles = []
         for idx in range(len(LEVELS)):
             r, c = divmod(idx, cols)
-            x = x0 + c * (bw + gap)
-            y = ytop - r * (bh + gap) - bh
+            x = gx0 + c * (tile + gap)
+            y = ytop - tile - r * (tile + gap)
             unlocked = idx < self.progress["unlocked"]
-            self._btn(x, y, bw, bh, "", f"level:{idx}", enabled=unlocked,
+            self._btn(x, y, tile, tile, "", f"level:{idx}", enabled=unlocked,
                       locked=not unlocked)
-            cx = x + bw / 2
-            if unlocked:
-                self._text(str(idx + 1), cx, y + bh * 0.60, s * 0.06, TEXT_C, bold=True)
-                self._stars(cx, y + bh * 0.26, self.progress["stars"].get(idx, 0),
-                            s * 0.018)
-            else:
-                self._text("⚿", cx, y + bh * 0.5, s * 0.05, DIM_C)  # lock-ish glyph
+            self._tiles.append((idx, x, y, tile, unlocked))
         bw2 = w * 0.4
-        self._btn(w / 2 - bw2 / 2, h * 0.08, bw2, s * 0.09, "Menu", "menu",
-                  fs=s * 0.04)
+        self._btn(w / 2 - bw2 / 2, h * 0.045, bw2, menu_h, "Menu", "menu", fs=s * 0.038)
+
+    def _draw_tile_overlay(self):
+        for (idx, x, y, tile, unlocked) in self._tiles:
+            cx = x + tile / 2
+            self._text(str(idx + 1), cx, y + tile * (0.56 if unlocked else 0.58),
+                       tile * 0.42, TEXT_C if unlocked else DIM_C, bold=True)
+            if unlocked:
+                self._stars(cx, y + tile * 0.24, self.progress["stars"].get(idx, 0),
+                            tile * 0.085)
+            else:
+                self._lock(cx, y + tile * 0.30, tile * 0.34)
 
     def _stars(self, cx, cy, n, r):
         for k in range(3):
@@ -910,11 +1342,11 @@ class GameWidget(Widget):
         Rectangle(pos=(0, 0), size=(w, h))
         self._text(title, w / 2, h * 0.66, s * 0.085, TITLE_C, bold=True)
         if stars is not None:
-            self._stars(w / 2, h * 0.56, stars, s * 0.03)
+            self._stars(w / 2, h * 0.565, stars, s * 0.03)
         if sub:
-            self._text(sub, w / 2, h * 0.50, s * 0.032, TEXT_C, mw=w * 0.8)
+            self._text(sub, w / 2, h * 0.50, s * 0.032, TEXT_C, mw=w * 0.85)
 
-    def _stack_buttons(self, labels, actions):
+    def _stack(self, labels, actions):
         w, h, s = self.width, self.height, self.scale
         bw, bh = w * 0.5, s * 0.09
         gap = s * 0.025
@@ -949,9 +1381,9 @@ class TetherApp(App):
 
 
 if __name__ == "__main__":
-    # Validate every level is solvable before we ever show it.
     for _lv in LEVELS:
-        assert solvable(_lv["grid"]), f"Level not solvable: {_lv['name']}"
+        assert no_hit_solvable(_lv["grid"]), \
+            f"Level not beatable on 1 life: {_lv['name']}"
     if platform not in ("android", "ios"):
         Window.size = (414, 736)
     TetherApp().run()
